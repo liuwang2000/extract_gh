@@ -39,15 +39,18 @@ def get_user_input():
 def build_regex_pattern(keywords):
     patterns = []
     for kw in keywords:
-        # 统一格式处理：允许空格/下划线/连字符
-        kw = re.sub(r'[-_ ]+', r'[\\s_-]?', kw)
-        # 转义特殊符号
-        escaped = re.escape(kw)
-        # 添加单词边界和格式通配
-        patterns.append(fr'\b{escaped}\b')
+        # 标准化输入格式
+        kw = re.sub(r'\s+', ' ', kw)  # 合并多余空格
+        # 构建精确匹配模式
+        pattern = r'\b' + re.sub(
+            r'[\\s_-]+', 
+            r'[\\s_-]+', 
+            re.escape(kw.lower())
+        ) + r'\b'
+        patterns.append(pattern)
     
     combined = '|'.join(patterns)
-    return fr'(?i)({combined})'  # 保持不区分大小写
+    return fr'(?i){combined}'  # 不区分大小写
 
 def process_files(args):
     # 文件验证
@@ -88,11 +91,13 @@ def process_files(args):
          open(os.path.join(output_dir, 'filtered.anno'), 'w') as f_out:
         
         for line in f_in:
-            if regex.search(line):
-                parts = line.split('\t')
-                gene_id = parts[0].split()[0]
-                if gene_id not in unique_ids:
-                    unique_ids.add(gene_id)
+            parts = line.split('\t')
+            if len(parts) < 2:
+                continue
+            # 仅在注释字段（第二列）匹配
+            if regex.search(parts[1]):
+                gene_id = parts[0].strip()
+                if gene_id in unique_ids:  # 只写入已收集的基因ID
                     f_out.write(line)
 
     # 提取序列函数
@@ -135,8 +140,8 @@ def process_files(args):
   - {output_prefix}.ffn
 执行时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}
 '''
-    with open(os.path.join(output_dir, 'report.txt'), 'w') as f:
-        f.write(report).encode('utf-8')
+    with open(os.path.join(output_dir, 'report.txt'), 'w', encoding='utf-8') as f:
+        f.write(report)
 
     # 文件验证
     for ext in ['faa', 'ffn']:
